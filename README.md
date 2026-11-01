@@ -9,6 +9,7 @@ Double-click to pin tabs, automatically pin Markdown and Excalidraw tabs as you 
 | 操作 | 效果 |
 | --- | --- |
 | 双击文件标签的标题、图标或空白处 | 固定 / 取消固定该标签 |
+| 点击固定标签上的 × | 直接关闭该标签，无需先取消固定 |
 | 在左侧文件列表中双击文件 | 打开并固定；已经固定的文件保持固定 |
 | 在左侧文件列表中单击已经固定的文件 | 跳转到已有标签，避免重复打开 |
 | 编辑 Markdown 内容 | 自动固定对应标签；手动取消后，下次编辑会再次固定 |
@@ -20,6 +21,8 @@ Double-click to pin tabs, automatically pin Markdown and Excalidraw tabs as you 
 例如：单击笔记 A 进行浏览，再单击 B 时沿用原生替换行为；开始编辑 B 后，B 自动固定，此后打开 C 时 B 会保留。想主动保留一个 PDF 或图片，也可以直接双击它的标签。
 
 ## 本 fork 的 Excalidraw 支持
+
+1.3.1 起，主编辑区的固定标签同时显示固定图标和原生 × 关闭按钮。点击固定图标取消固定，点击 × 直接关闭；双击标题仍切换固定状态。通过插件样式恢复原生关闭按钮，不改写关闭流程或快捷键，也不影响侧边栏标签。禁用插件会恢复 Obsidian 默认显示。
 
 基于 [xgrfffff/smart-tab-pin](https://github.com/xgrfffff/smart-tab-pin)，新增 Excalidraw 编辑后自动固定。保留原作者信息及原有 Markdown、双击固定行为。
 
@@ -37,8 +40,8 @@ Double-click to pin tabs, automatically pin Markdown and Excalidraw tabs as you 
 
 要求：**Obsidian 桌面端 1.5.7 或更高版本**。
 
-1. 本 fork 发布 release 前，从功能分支下载 [main.js](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/main.js) 和 [manifest.json](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/manifest.json)；发布后也可从 [Releases](https://github.com/huang7loong/smart-tab-pin/releases) 下载。
-2. 在你的 Obsidian 仓库中创建 `.obsidian/plugins/smart-tab-pin/`，把两个文件放进去：
+1. 本 fork 发布 release 前，从功能分支下载 [main.js](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/main.js)、[manifest.json](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/manifest.json) 和 [styles.css](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/styles.css)；发布后也可从 [Releases](https://github.com/huang7loong/smart-tab-pin/releases) 下载。
+2. 在你的 Obsidian 仓库中创建 `.obsidian/plugins/smart-tab-pin/`，把三个文件放进去：
 
    ```text
    你的仓库/
@@ -46,14 +49,15 @@ Double-click to pin tabs, automatically pin Markdown and Excalidraw tabs as you 
        └── plugins/
            └── smart-tab-pin/
                ├── main.js
-               └── manifest.json
+               ├── manifest.json
+               └── styles.css
    ```
 
 3. 重启 Obsidian，在「设置 → 第三方插件」中启用 **Smart Tab Pin**。若受限模式开启，需先关闭。
 
-插件没有设置页，启用后即可使用。无需 npm、构建步骤或额外的 CSS 文件。
+插件没有设置页，启用后即可使用。无需 npm 或构建步骤；`styles.css` 随插件自动加载。
 
-更新时，用新版本的两个文件替换原文件，再禁用并重新启用插件，或重启 Obsidian。
+更新时，用新版本的三个文件替换原文件，再禁用并重新启用插件，或重启 Obsidian。
 
 ## 行为说明
 

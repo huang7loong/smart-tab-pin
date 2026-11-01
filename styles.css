@@ -1,0 +1,7 @@
+/* Obsidian hides the native close button when a tab is pinned. Keep both
+   controls available in the main workspace, including popout windows.
+   !important overrides the inline display:none set by WorkspaceLeaf. */
+.mod-root .workspace-tab-header:has(.workspace-tab-header-status-icon.mod-pinned)
+  .workspace-tab-header-inner-close-button {
+  display: flex !important;
+}
