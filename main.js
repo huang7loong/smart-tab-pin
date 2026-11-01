@@ -7,6 +7,8 @@ module.exports = class SmartTabPin extends Plugin {
     this.documents = new Set();
     this.stopped = false;
     this.pendingPin = null;
+    this.excalidrawSubscriptions = new Map();
+    this.excalidrawRetry = null;
     this.onFileClick = (event) => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       const target = event.target?.closest ? event.target : event.target?.parentElement;
@@ -67,6 +69,9 @@ module.exports = class SmartTabPin extends Plugin {
     };
     this.register(() => {
       this.stopped = true;
+      clearTimeout(this.excalidrawRetry);
+      for (const subscription of this.excalidrawSubscriptions.values()) subscription.unsubscribe();
+      this.excalidrawSubscriptions.clear();
       clearTimeout(this.pinTimeout);
       clearTimeout(this.pinAttempt);
       this.pendingPin = null;
@@ -76,10 +81,15 @@ module.exports = class SmartTabPin extends Plugin {
       }
       this.documents.clear();
     });
-    this.registerEvent(this.app.workspace.on('file-open', () => this.pinOpenedFile()));
+    this.registerEvent(this.app.workspace.on('file-open', () => {
+      this.pinOpenedFile();
+      this.syncExcalidrawViews();
+    }));
+    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.syncExcalidrawViews()));
     this.registerEvent(this.app.workspace.on('layout-change', () => {
       this.syncDocuments();
       this.pinOpenedFile();
+      this.syncExcalidrawViews();
     }));
     this.registerEvent(this.app.workspace.on('window-open', (_workspaceWindow, win) => this.attachDocument(win.document)));
     this.registerEvent(this.app.workspace.on('window-close', (_workspaceWindow, win) => {
@@ -87,7 +97,10 @@ module.exports = class SmartTabPin extends Plugin {
       win.document.removeEventListener('click', this.onFileClick, true);
       this.documents.delete(win.document);
     }));
-    this.app.workspace.onLayoutReady(() => this.syncDocuments());
+    this.app.workspace.onLayoutReady(() => {
+      this.syncDocuments();
+      this.syncExcalidrawViews();
+    });
     this.registerEditorExtension(EditorView.updateListener.of((update) => {
       if (this.stopped || !update.docChanged) return;
       const edited = update.transactions.some((tr) => tr.docChanged
@@ -102,6 +115,56 @@ module.exports = class SmartTabPin extends Plugin {
         return true;
       });
     }));
+  }
+
+  syncExcalidrawViews() {
+    if (this.stopped) return;
+    clearTimeout(this.excalidrawRetry);
+    this.excalidrawRetry = null;
+    const live = new Set();
+    let waitingForCanvas = false;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const view = leaf.view;
+      if (view.getViewType() !== 'excalidraw' || !this.isMainFile(leaf)) return;
+      live.add(leaf);
+      const api = view.excalidrawAPI;
+      const previous = this.excalidrawSubscriptions.get(leaf);
+      if (previous?.view === view && previous.api === api) return;
+      if (previous) {
+        previous.unsubscribe();
+        this.excalidrawSubscriptions.delete(leaf);
+      }
+      // React may initialize after file-open/layout-change. Retry only while
+      // a canvas is loading; an older API without onIncrement is left alone.
+      if (!api) {
+        if (!view.semaphores?.viewunload && !view._loaded) waitingForCanvas = true;
+        return;
+      }
+      if (typeof api.onIncrement !== 'function') return;
+      const unsubscribe = api.onIncrement((increment) => {
+        if (this.stopped || leaf.view !== view || view.excalidrawAPI !== api
+          || !view._loaded || view.semaphores?.justLoaded || view.semaphores?.viewunload
+          || !this.isMainFile(leaf) || leaf !== this.app.workspace.getMostRecentLeaf()) return;
+        // Durable increments are committed, undoable edits. Initial loading,
+        // external synchronization and in-progress gestures emit ephemerals.
+        // Selection-only durable updates must not pin a browsing tab either.
+        if (increment?.type !== 'durable') return;
+        const change = increment.change;
+        const contentChanged = Object.keys(change?.elements ?? {}).length > 0
+          || Object.prototype.hasOwnProperty.call(change?.appState ?? {}, 'viewBackgroundColor');
+        if (contentChanged && !leaf.getViewState().pinned) leaf.setPinned(true);
+      });
+      this.excalidrawSubscriptions.set(leaf, { view, api, unsubscribe });
+    });
+    for (const [leaf, subscription] of this.excalidrawSubscriptions) {
+      if (!live.has(leaf)) {
+        subscription.unsubscribe();
+        this.excalidrawSubscriptions.delete(leaf);
+      }
+    }
+    if (waitingForCanvas) {
+      this.excalidrawRetry = setTimeout(() => this.syncExcalidrawViews(), 250);
+    }
   }
 
   sidebarFileRow(target) {
