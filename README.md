@@ -1,8 +1,8 @@
 # Smart Tab Pin
 
-为 Obsidian 提供双击固定标签、编辑时自动固定，以及跳转到已有固定标签的功能。使用 Obsidian 原生 Pin，无需配置。
+为 Obsidian 提供双击固定标签、编辑 Markdown / Excalidraw 时自动固定，以及跳转到已有固定标签的功能。使用 Obsidian 原生 Pin，无需配置。
 
-Double-click to pin tabs, automatically pin Markdown tabs as you edit, and reuse existing pinned tabs in Obsidian.
+Double-click to pin tabs, automatically pin Markdown and Excalidraw tabs as you edit, and reuse existing pinned tabs in Obsidian.
 
 ## 功能与使用
 
@@ -12,17 +12,32 @@ Double-click to pin tabs, automatically pin Markdown tabs as you edit, and reuse
 | 在左侧文件列表中双击文件 | 打开并固定；已经固定的文件保持固定 |
 | 在左侧文件列表中单击已经固定的文件 | 跳转到已有标签，避免重复打开 |
 | 编辑 Markdown 内容 | 自动固定对应标签；手动取消后，下次编辑会再次固定 |
+| 在 Excalidraw 中完成内容修改 | 自动固定当前绘图标签；仅浏览不会固定 |
 | 单击其他文件，且当前标签未固定 | 保持 Obsidian 原生的标签替换行为 |
 
 左侧文件列表支持 Obsidian 原生文件列表和 [Notebook Navigator](https://github.com/johansan/notebook-navigator)。Notebook Navigator 是可选插件，无需安装也能使用 Smart Tab Pin。
 
 例如：单击笔记 A 进行浏览，再单击 B 时沿用原生替换行为；开始编辑 B 后，B 自动固定，此后打开 C 时 B 会保留。想主动保留一个 PDF 或图片，也可以直接双击它的标签。
 
+## 本 fork 的 Excalidraw 支持
+
+基于 [xgrfffff/smart-tab-pin](https://github.com/xgrfffff/smart-tab-pin)，新增 Excalidraw 编辑后自动固定。保留原作者信息及原有 Markdown、双击固定行为。
+
+- 在当前 Excalidraw 标签中完成画线、新建、移动、缩放、删除元素、文字/样式修改及撤销/重做时自动固定。插入公式或图片等操作在提交为可撤销的元素变更时也会触发。
+- 仅打开绘图、选择元素、平移画布、缩放视野、切换工具不会自动固定。加载和常规外部同步的临时变更也不触发。
+- 取消固定后，下一次完成内容修改会再次固定。笔画或拖动操作在提交时（通常为松开鼠标/笔）固定，而不是按下时。
+- Excalidraw 是可选依赖；通过其 `excalidrawAPI.onIncrement` 订阅可撤销变更，不接管现有脚本钩子。缺少此接口的旧版本不会启用绘图自动固定，其他功能继续可用。
+- 对接依据：Excalidraw 插件 2.29.0 与其画布 `onIncrement` 接口。加载保护还依赖插件视图的 `_loaded` / `semaphores` 状态，未来插件更新可能需要适配。此处按提交类型识别修改，**不是用户输入来源检测**；脚本若在当前绘图中提交可撤销变更，也会触发固定。
+
+### 验证
+
+运行 `node --test` 执行模拟 Obsidian/Excalidraw 事件的回归测试，无需安装依赖。这不等同于真实 Obsidian 界面测试；安装后仍应检查画图、撤销/重做、取消固定后重试、浏览、重新打开和弹出窗口。
+
 ## 安装
 
 要求：**Obsidian 桌面端 1.5.7 或更高版本**。
 
-1. 前往 [Releases](https://github.com/xgrfffff/smart-tab-pin/releases/latest)，下载 `main.js` 和 `manifest.json`。
+1. 本 fork 发布 release 前，从功能分支下载 [main.js](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/main.js) 和 [manifest.json](https://raw.githubusercontent.com/huang7loong/smart-tab-pin/feat/excalidraw-auto-pin/manifest.json)；发布后也可从 [Releases](https://github.com/huang7loong/smart-tab-pin/releases) 下载。
 2. 在你的 Obsidian 仓库中创建 `.obsidian/plugins/smart-tab-pin/`，把两个文件放进去：
 
    ```text
@@ -42,8 +57,8 @@ Double-click to pin tabs, automatically pin Markdown tabs as you edit, and reuse
 
 ## 行为说明
 
-- **自动固定的范围**：Markdown 实时预览和源码模式。输入（含中文输入法）、删除、剪切、粘贴、拖动文本、撤销和重做等实际改变内容的操作会触发。
-- **不会触发自动固定**：仅打开文件、移动光标、选中文本或外部同步；阅读模式下的复选框、属性面板、Canvas 编辑，以及第三方插件未标记为用户操作的程序修改也不在自动固定范围内。
+- **自动固定的范围**：Markdown 实时预览和源码模式，以及上述 Excalidraw 可撤销内容修改。Markdown 中的输入（含中文输入法）、删除、剪切、粘贴、拖动文本、撤销和重做等实际改变内容的操作会触发。
+- **不会触发自动固定**：仅打开文件、移动光标、选中文本或常规外部同步；阅读模式下的复选框、属性面板、Canvas 编辑，以及 Markdown 中第三方插件未标记为用户操作的程序修改也不在自动固定范围内。Excalidraw 脚本变更的规则见上文。
 - **双击标签的范围**：Markdown、PDF、Canvas、图片等文件标签，支持分屏和弹出窗口。不处理侧边栏面板标签、关闭按钮或固定图标等状态按钮。
 - **修饰键**：Ctrl / Cmd / Shift / Alt 点击保留原有行为，带这些修饰键的双击也不切换固定。
 - **多个固定副本**：单击左侧文件时，优先跳转到当前标签，其次是同窗口内的固定副本。
@@ -52,11 +67,11 @@ Double-click to pin tabs, automatically pin Markdown tabs as you edit, and reuse
 
 ## 兼容性与反馈
 
-作者已在自己的 Obsidian 桌面环境中长期日常使用。最低版本声明为 1.5.7，不代表已逐一测试所有版本、主题及第三方插件组合。
+原作者已在自己的 Obsidian 桌面环境中长期日常使用原版功能。本 fork 新增的 Excalidraw 支持目前通过模拟事件测试，尚未完成真实界面测试。最低版本声明为 1.5.7，不代表已逐一测试所有版本、主题及第三方插件组合。
 
 插件通过 Obsidian 原生接口固定标签，通过 CodeMirror 识别用户编辑。标签及文件列表定位也依赖 Obsidian 和 Notebook Navigator 的界面结构；这些应用更新后可能需要适配。
 
-遇到问题可在 [Issues](https://github.com/xgrfffff/smart-tab-pin/issues) 中提供 Obsidian 版本、操作系统、复现步骤，以及是否使用 Notebook Navigator。
+遇到问题可在 [Issues](https://github.com/huang7loong/smart-tab-pin/issues) 中提供 Obsidian 版本、操作系统、复现步骤，以及是否使用 Notebook Navigator。
 
 ## 源码
 
