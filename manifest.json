@@ -1,7 +1,7 @@
 {
   "id": "smart-tab-pin",
   "name": "Smart Tab Pin",
-  "version": "1.3.1",
+  "version": "1.2.0",
   "minAppVersion": "1.5.7",
   "description": "Double-click file tabs to toggle native pinning; automatically pin Markdown and Excalidraw tabs when editing.",
   "author": "xugenrui",
