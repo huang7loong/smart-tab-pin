@@ -8,6 +8,7 @@ module.exports = class SmartTabPin extends Plugin {
     this.stopped = false;
     this.pendingPin = null;
     this.excalidrawSubscriptions = new Map();
+    this.excalidrawAttempts = new WeakMap();
     this.excalidrawRetry = null;
     this.onFileClick = (event) => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
@@ -117,7 +118,7 @@ module.exports = class SmartTabPin extends Plugin {
     }));
   }
 
-  syncExcalidrawViews() {
+  syncExcalidrawViews(retrying = false) {
     if (this.stopped) return;
     clearTimeout(this.excalidrawRetry);
     this.excalidrawRetry = null;
@@ -125,7 +126,7 @@ module.exports = class SmartTabPin extends Plugin {
     let waitingForCanvas = false;
     this.app.workspace.iterateAllLeaves((leaf) => {
       const view = leaf.view;
-      if (view.getViewType() !== 'excalidraw' || !this.isMainFile(leaf)) return;
+      if (leaf.isDeferred || view.getViewType() !== 'excalidraw' || !this.isMainFile(leaf)) return;
       live.add(leaf);
       const api = view.excalidrawAPI;
       const previous = this.excalidrawSubscriptions.get(leaf);
@@ -134,12 +135,17 @@ module.exports = class SmartTabPin extends Plugin {
         previous.unsubscribe();
         this.excalidrawSubscriptions.delete(leaf);
       }
-      // React may initialize after file-open/layout-change. Retry only while
-      // a canvas is loading; an older API without onIncrement is left alone.
+      // React may mount excalidrawAPI asynchronously after Component._loaded
+      // is already true. Deferred tabs are skipped above, and per-view retries
+      // are capped so broken or legacy views cannot poll indefinitely.
       if (!api) {
-        if (!view.semaphores?.viewunload && !view._loaded) waitingForCanvas = true;
+        if (view.semaphores?.viewunload) return;
+        const attempts = (this.excalidrawAttempts.get(view) ?? 0) + (retrying ? 1 : 0);
+        this.excalidrawAttempts.set(view, attempts);
+        if (attempts < 20) waitingForCanvas = true;
         return;
       }
+      this.excalidrawAttempts.delete(view);
       if (typeof api.onIncrement !== 'function') return;
       const unsubscribe = api.onIncrement((increment) => {
         if (this.stopped || leaf.view !== view || view.excalidrawAPI !== api
@@ -163,7 +169,7 @@ module.exports = class SmartTabPin extends Plugin {
       }
     }
     if (waitingForCanvas) {
-      this.excalidrawRetry = setTimeout(() => this.syncExcalidrawViews(), 250);
+      this.excalidrawRetry = setTimeout(() => this.syncExcalidrawViews(true), 250);
     }
   }
 

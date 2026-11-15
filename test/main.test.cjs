@@ -139,6 +139,53 @@ test('late canvas initialization attaches without another workspace event', () =
   h.unload();
 });
 
+test('late React API mount attaches even when view._loaded is already true', () => {
+  const c = canvas(); const api = c.view.excalidrawAPI;
+  c.view.excalidrawAPI = null; c.view._loaded = true;
+  const h = host([c.leaf]);
+  assert.equal(h.timers.size, 1);
+  c.view.excalidrawAPI = api;
+  h.tick(); c.emit(edit());
+  assert.equal(c.leaf.pinned, true); assert.equal(h.timers.size, 0);
+  h.unload();
+});
+
+test('deferred background leaves do not poll until un-deferred', () => {
+  const active = canvas(); active.view.getViewType = () => 'markdown';
+  const real = canvas();
+  const deferredLeaf = {
+    isDeferred: true,
+    view: { getViewType: () => 'excalidraw', containerEl: real.view.containerEl, _loaded: false },
+    pinned: false, pinCalls: 0,
+    getRoot: () => 'main',
+    getViewState() { return { pinned: this.pinned, state: { file: 'bg.excalidraw.md' } }; },
+    setPinned(value) { this.pinned = value; this.pinCalls++; },
+  };
+  const h = host([active.leaf, deferredLeaf]);
+  assert.equal(h.timers.size, 0);
+  deferredLeaf.isDeferred = false;
+  deferredLeaf.view = real.view;
+  h.workspace.active = deferredLeaf;
+  h.event('active-leaf-change');
+  real.emit(edit());
+  assert.equal(deferredLeaf.pinned, true);
+  h.unload();
+});
+
+test('missing Excalidraw API stops retrying after bounded attempts', () => {
+  const c = canvas();
+  c.view.excalidrawAPI = null; c.view._loaded = true;
+  const h = host([c.leaf]);
+  for (let i = 0; i < 20; i++) {
+    assert.equal(h.timers.size, 1);
+    h.tick();
+  }
+  assert.equal(h.timers.size, 0);
+  h.event('layout-change');
+  assert.equal(h.timers.size, 0);
+  h.unload();
+});
+
 test('workspace events attach new canvases and never duplicate subscriptions', () => {
   const h = host(); const c = canvas();
   h.workspace.leaves.push(c.leaf); h.workspace.active = c.leaf;
